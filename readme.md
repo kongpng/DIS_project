@@ -24,3 +24,6 @@ Prerequisites for running the code
 - Sqlite
 - Go
 
+How to interact with the web app
+
+To interact with the web app, you can navigate to a category for example 'customers' where you will be met by the contents of the respective table. From there you can add or delete to the table by clicking on the respective buttons. Alternatively you can search on the 'home page' on specific things, for example you can search for 'John' in customers which will return all the different customers named John (Potential GDPR nightmare). 
