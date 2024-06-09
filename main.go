@@ -2,9 +2,7 @@ package main
 
 import (
     "database/sql"
-    "encoding/json"
     "fmt"
-    "io/ioutil"
     "log"
     "net/http"
     "strconv"
@@ -27,46 +25,254 @@ func main() {
 }
 
 func setupRoutes(db *sql.DB) {
+    // Home page
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        fmt.Fprintf(w, "<html><head><title>Welcome</title><link rel='stylesheet' type='text/css' href='/static/style.css'></head><body>Welcome to the API Server</body></html>")
+        fmt.Fprintf(w, `
+        <html>
+        <head>
+            <title>Welcome</title>
+            <link rel='stylesheet' type='text/css' href='/static/style.css'>
+        </head>
+        <body>
+            <h1>Welcome to the API Server</h1>
+            <nav>
+                <ul>
+                    <li><a href="/customers">Customers</a></li>
+                    <li><a href="/orders">Orders</a></li>
+                    <li><a href="/deliveries">Deliveries</a></li>
+                    <li><a href="/restaurants">Restaurants</a></li>
+                    <li><a href="/menus">Menus</a></li>
+                    <li><a href="/dishes">Dishes</a></li>
+                </ul>
+            </nav>
+        </body>
+        </html>
+        `)
     })
 
-    http.HandleFunc("/customers", customerHandler(db))
-    http.HandleFunc("/orders", orderHandler(db))
-    http.HandleFunc("/deliveries", deliveryHandler(db))
-    http.HandleFunc("/restaurants", restaurantHandler(db))
-    http.HandleFunc("/menus", menuHandler(db))
-    http.HandleFunc("/dishes", dishHandler(db))
+    // Customer handlers
+    http.HandleFunc("/customers", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetCustomers(db, w, r)
+        case "POST":
+            handlePostCustomer(db, w, r)
+        }
+    })
 
+    http.HandleFunc("/addCustomer", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "GET" {
+            fmt.Fprintf(w, `
+            <html>
+            <head><title>Add Customer</title></head>
+            <body>
+            <form action="/customers" method="post">
+                <label>Name: <input type="text" name="name" /></label><br/>
+                <label>Address: <input type="text" name="address" /></label><br/>
+                <label>Email: <input type="email" name="email" /></label><br/>
+                <input type="submit" value="Add Customer" />
+            </form>
+            </body>
+            </html>
+            `)
+        }
+    })
+
+    http.HandleFunc("/deleteCustomer", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            handleDeleteCustomer(db, w, r)
+        }
+    })
+
+    // Order handlers
+    http.HandleFunc("/orders", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetOrders(db, w, r)
+        case "POST":
+            handlePostOrder(db, w, r)
+        }
+    })
+
+    http.HandleFunc("/addOrder", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "GET" {
+            fmt.Fprintf(w, `
+            <html>
+            <head><title>Add Order</title></head>
+            <body>
+            <form action="/orders" method="post">
+                <label>Customer ID: <input type="number" name="customerID" /></label><br/>
+                <label>Date (YYYY-MM-DD): <input type="date" name="date" /></label><br/>
+                <input type="submit" value="Add Order" />
+            </form>
+            </body>
+            </html>
+            `)
+        }
+    })
+
+    http.HandleFunc("/deleteOrder", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            handleDeleteOrder(db, w, r)
+        }
+    })
+
+    // Delivery handlers
+    http.HandleFunc("/deliveries", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetDeliveries(db, w, r)
+        case "POST":
+            handlePostDelivery(db, w, r)
+        }
+    })
+
+    http.HandleFunc("/addDelivery", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "GET" {
+            fmt.Fprintf(w, `
+            <html>
+            <head><title>Add Delivery</title></head>
+            <body>
+            <form action="/deliveries" method="post">
+                <label>Order ID: <input type="number" name="orderID" /></label><br/>
+                <label>Delivery Time (HH:MM): <input type="time" name="dTime" /></label><br/>
+                <label>Delivery Cost: <input type="number" name="dCost" /></label><br/>
+                <input type="submit" value="Add Delivery" />
+            </form>
+            </body>
+            </html>
+            `)
+        }
+    })
+
+    http.HandleFunc("/deleteDelivery", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            handleDeleteDelivery(db, w, r)
+        }
+    })
+
+    // Restaurant handlers
+    http.HandleFunc("/restaurants", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetRestaurants(db, w, r)
+        case "POST":
+            handlePostRestaurant(db, w, r)
+        }
+    })
+
+    http.HandleFunc("/addRestaurant", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "GET" {
+            fmt.Fprintf(w, `
+            <html>
+            <head><title>Add Restaurant</title></head>
+            <body>
+            <form action="/restaurants" method="post">
+                <label>Name: <input type="text" name="name" /></label><br/>
+                <label>Address: <input type="text" name="address" /></label><br/>
+                <label>Open: <input type="checkbox" name="open" /></label><br/>
+                <label>Cuisine: <input type="text" name="cuisine" /></label><br/>
+                <input type="submit" value="Add Restaurant" />
+            </form>
+            </body>
+            </html>
+            `)
+        }
+    })
+
+    http.HandleFunc("/deleteRestaurant", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            handleDeleteRestaurant(db, w, r)
+        }
+    })
+
+    // Menu handlers
+    http.HandleFunc("/menus", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetMenus(db, w, r)
+        case "POST":
+            handlePostMenu(db, w, r)
+        }
+    })
+
+    http.HandleFunc("/addMenu", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "GET" {
+            fmt.Fprintf(w, `
+            <html>
+            <head><title>Add Menu</title></head>
+            <body>
+            <form action="/menus" method="post">
+                <label>Restaurant ID: <input type="number" name="restaurantID" /></label><br/>
+                <input type="submit" value="Add Menu" />
+            </form>
+            </body>
+            </html>
+            `)
+        }
+    })
+
+    http.HandleFunc("/deleteMenu", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            handleDeleteMenu(db, w, r)
+        }
+    })
+
+    // Dish handlers
+    http.HandleFunc("/dishes", func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetDishes(db, w, r)
+        case "POST":
+            handlePostDish(db, w, r)
+        }
+    })
+
+    http.HandleFunc("/addDish", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "GET" {
+            fmt.Fprintf(w, `
+            <html>
+            <head><title>Add Dish</title></head>
+            <body>
+            <form action="/dishes" method="post">
+                <label>Menu ID: <input type="number" name="menuID" /></label><br/>
+                <label>Name: <input type="text" name="name" /></label><br/>
+                <label>Price: <input type="number" name="price" /></label><br/>
+                <label>Vegan: <input type="checkbox" name="vegan" /></label><br/>
+                <label>Contains Shellfish: <input type="checkbox" name="shellfish" /></label><br/>
+                <label>Contains Nuts: <input type="checkbox" name="nuts" /></label><br/>
+                <input type="submit" value="Add Dish" />
+            </form>
+            </body>
+            </html>
+            `)
+        }
+    })
+
+    http.HandleFunc("/deleteDish", func(w http.ResponseWriter, r *http.Request) {
+        if r.Method == "POST" {
+            handleDeleteDish(db, w, r)
+        }
+    })
+
+    // Serve static files
     http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
+    // Catch-all handler for undefined routes
     http.HandleFunc("/catch-all", func(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "This route is not defined: "+r.URL.Path, http.StatusNotFound)
     })
 }
 
-func customerHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleListCustomers(db, w, r)
-        case "POST":
-            handleAddCustomer(db, w, r)
-        case "DELETE":
-            handleDeleteCustomer(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
-func handleListCustomers(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+// Customer Handlers
+func handleGetCustomers(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     customers, err := fetchCustomers(db)
     if err != nil {
         http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Customers List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addCustomer">Add Customer</a></nav>`)
     fmt.Fprintf(w, `<h1>Customers</h1><ul>`)
     for _, c := range customers {
         fmt.Fprintf(w, `<li>ID: %d, Name: %s, Address: %s, Email: %s</li>`, c.ID, c.Name, c.Address, c.Email)
@@ -74,28 +280,22 @@ func handleListCustomers(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+func handlePostCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     var c Customer
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &c); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addCustomer(db, c.Name, c.Address, c.Email)
+    c.Name = r.FormValue("name")
+    c.Address = r.FormValue("address")
+    c.Email = r.FormValue("email")
+    _, err := addCustomer(db, c.Name, c.Address, c.Email)
     if err != nil {
         http.Error(w, fmt.Sprintf("Error adding customer: %v", err), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Add Customer</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-    fmt.Fprintf(w, `<h1>New customer added with ID: %d</h1></body></html>`, id)
+    fmt.Fprintf(w, `<h1>New customer added</h1></body></html>`)
 }
 
 func handleDeleteCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
+    idStr := r.FormValue("id")
     id, err := strconv.Atoi(idStr)
     if err != nil {
         http.Error(w, "Invalid customer ID", http.StatusBadRequest)
@@ -143,21 +343,7 @@ func deleteCustomer(db *sql.DB, id int) error {
     return err
 }
 
-func orderHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetOrders(db, w, r)
-        case "POST":
-            handleAddOrder(db, w, r)
-        case "DELETE":
-            handleDeleteOrder(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
+// Order Handlers
 func handleGetOrders(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     orders, err := fetchOrders(db)
     if err != nil {
@@ -165,35 +351,29 @@ func handleGetOrders(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         return
     }
     fmt.Fprintf(w, `<html><head><title>Orders List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addOrder">Add Order</a></nav>`)
     fmt.Fprintf(w, `<h1>Orders</h1><ul>`)
     for _, o := range orders {
-        fmt.Fprintf(w, `<li>Order ID: %d, Customer ID: %d, Date: %s</li>`, o.ID, o.CustomerID, o.Date.Format(time.RFC1123))
+        fmt.Fprintf(w, `<li>Order ID: %d, Customer ID: %d, Date: %s</li>`, o.ID, o.CustomerID, o.Date)
     }
     fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+func handlePostOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     var o Order
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &o); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addOrder(db, o.CustomerID, o.Date)
+    o.CustomerID, _ = strconv.Atoi(r.FormValue("customerID"))
+    o.Date, _ = time.Parse("2006-01-02", r.FormValue("date"))
+    _, err := addOrder(db, o.CustomerID, o.Date)
     if err != nil {
         http.Error(w, "Failed to add order: "+err.Error(), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Add Order</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-    fmt.Fprintf(w, `<h1>New order added with ID: %d</h1></body></html>`, id)
+    fmt.Fprintf(w, `<h1>New order added</h1></body></html>`)
 }
 
 func handleDeleteOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
+    idStr := r.FormValue("id")
     id, err := strconv.Atoi(idStr)
     if err != nil {
         http.Error(w, "Invalid order ID", http.StatusBadRequest)
@@ -241,21 +421,7 @@ func deleteOrder(db *sql.DB, id int) error {
     return err
 }
 
-func deliveryHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetDeliveries(db, w, r)
-        case "POST":
-            handleAddDelivery(db, w, r)
-        case "DELETE":
-            handleDeleteDelivery(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
+// Delivery Handlers
 func handleGetDeliveries(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     deliveries, err := fetchDeliveries(db)
     if err != nil {
@@ -263,6 +429,7 @@ func handleGetDeliveries(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         return
     }
     fmt.Fprintf(w, `<html><head><title>Deliveries</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addDelivery">Add Delivery</a></nav>`)
     fmt.Fprintf(w, `<h1>Deliveries</h1><ul>`)
     for _, d := range deliveries {
         fmt.Fprintf(w, `<li>Delivery ID: %d, Order ID: %d, Time: %d, Cost: %d</li>`, d.ID, d.OrderID, d.DTime, d.DCost)
@@ -270,28 +437,22 @@ func handleGetDeliveries(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+func handlePostDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     var d Delivery
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &d); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addDelivery(db, d.OrderID, d.DTime, d.DCost)
+    d.OrderID, _ = strconv.Atoi(r.FormValue("orderID"))
+    d.DTime, _ = strconv.Atoi(r.FormValue("dTime"))
+    d.DCost, _ = strconv.Atoi(r.FormValue("dCost"))
+    _, err := addDelivery(db, d.OrderID, d.DTime, d.DCost)
     if err != nil {
         http.Error(w, "Failed to add delivery: "+err.Error(), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Add Delivery</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-    fmt.Fprintf(w, `<h1>New delivery added with ID: %d</h1></body></html>`, id)
+    fmt.Fprintf(w, `<h1>New delivery added</h1></body></html>`)
 }
 
 func handleDeleteDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
+    idStr := r.FormValue("id")
     id, err := strconv.Atoi(idStr)
     if err != nil {
         http.Error(w, "Invalid delivery ID", http.StatusBadRequest)
@@ -339,21 +500,7 @@ func deleteDelivery(db *sql.DB, id int) error {
     return err
 }
 
-func restaurantHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetRestaurants(db, w, r)
-        case "POST":
-            handleAddRestaurant(db, w, r)
-        case "DELETE":
-            handleDeleteRestaurant(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
+// Restaurant Handlers
 func handleGetRestaurants(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     restaurants, err := fetchRestaurants(db)
     if err != nil {
@@ -361,6 +508,7 @@ func handleGetRestaurants(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         return
     }
     fmt.Fprintf(w, `<html><head><title>Restaurants List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addRestaurant">Add Restaurant</a></nav>`)
     fmt.Fprintf(w, `<h1>Restaurants</h1><ul>`)
     for _, r := range restaurants {
         fmt.Fprintf(w, `<li>ID: %d, Name: %s, Address: %s, Open: %t, Cuisine: %s</li>`, r.ID, r.Name, r.Address, r.Open, r.Cuisine)
@@ -368,28 +516,23 @@ func handleGetRestaurants(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    var restaurant Restaurant
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &restaurant); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addRestaurant(db, restaurant.Name, restaurant.Address, restaurant.Open, restaurant.Cuisine)
+func handlePostRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+    var res Restaurant
+    res.Name = r.FormValue("name")
+    res.Address = r.FormValue("address")
+    res.Open = r.FormValue("open") == "on"
+    res.Cuisine = r.FormValue("cuisine")
+    _, err := addRestaurant(db, res.Name, res.Address, res.Open, res.Cuisine)
     if err != nil {
         http.Error(w, "Failed to add restaurant: "+err.Error(), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Add Restaurant</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-    fmt.Fprintf(w, `<h1>New restaurant added with ID: %d</h1></body></html>`, id)
+    fmt.Fprintf(w, `<h1>New restaurant added</h1></body></html>`)
 }
 
 func handleDeleteRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
+    idStr := r.FormValue("id")
     id, err := strconv.Atoi(idStr)
     if err != nil {
         http.Error(w, "Invalid restaurant ID", http.StatusBadRequest)
@@ -413,9 +556,9 @@ func fetchRestaurants(db *sql.DB) ([]Restaurant, error) {
     for rows.Next() {
         var r Restaurant
         if err := rows.Scan(&r.ID, &r.Name, &r.Address, &r.Open, &r.Cuisine); err != nil {
-        return nil, err
-    }
-    restaurants = append(restaurants, r)
+            return nil, err
+        }
+        restaurants = append(restaurants, r)
     }
     return restaurants, nil
 }
@@ -437,21 +580,7 @@ func deleteRestaurant(db *sql.DB, id int) error {
     return err
 }
 
-func menuHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetMenus(db, w, r)
-        case "POST":
-            handleAddMenu(db, w, r)
-        case "DELETE":
-            handleDeleteMenu(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
+// Menu Handlers
 func handleGetMenus(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     menus, err := fetchMenus(db)
     if err != nil {
@@ -459,6 +588,7 @@ func handleGetMenus(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         return
     }
     fmt.Fprintf(w, `<html><head><title>Menus List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addMenu">Add Menu</a></nav>`)
     fmt.Fprintf(w, `<h1>Menus</h1><ul>`)
     for _, m := range menus {
         fmt.Fprintf(w, `<li>ID: %d, Restaurant ID: %d</li>`, m.ID, m.RestaurantID)
@@ -466,28 +596,20 @@ func handleGetMenus(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+func handlePostMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     var m Menu
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &m); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addMenu(db, m.RestaurantID)
+    m.RestaurantID, _ = strconv.Atoi(r.FormValue("restaurantID"))
+    _, err := addMenu(db, m.RestaurantID)
     if err != nil {
         http.Error(w, "Failed to add menu: "+err.Error(), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Add Menu</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-    fmt.Fprintf(w, `<h1>New menu added with ID: %d</h1></body></html>`, id)
+    fmt.Fprintf(w, `<h1>New menu added</h1></body></html>`)
 }
 
 func handleDeleteMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
+    idStr := r.FormValue("id")
     id, err := strconv.Atoi(idStr)
     if err != nil {
         http.Error(w, "Invalid menu ID", http.StatusBadRequest)
@@ -535,21 +657,7 @@ func deleteMenu(db *sql.DB, id int) error {
     return err
 }
 
-func dishHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetDishes(db, w, r)
-        case "POST":
-            handleAddDish(db, w, r)
-        case "DELETE":
-            handleDeleteDish(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
+// Dish Handlers
 func handleGetDishes(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     dishes, err := fetchDishes(db)
     if err != nil {
@@ -557,6 +665,7 @@ func handleGetDishes(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         return
     }
     fmt.Fprintf(w, `<html><head><title>Dishes List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addDish">Add Dish</a></nav>`)
     fmt.Fprintf(w, `<h1>Dishes</h1><ul>`)
     for _, d := range dishes {
         fmt.Fprintf(w, `<li>ID: %d, Menu ID: %d, Name: %s, Price: %d, Vegan: %t, Shellfish: %t, Nuts: %t</li>`, d.ID, d.MenuID, d.Name, d.Price, d.Vegan, d.Shellfish, d.Nuts)
@@ -564,28 +673,25 @@ func handleGetDishes(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+func handlePostDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     var d Dish
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &d); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addDish(db, d.MenuID, d.Name, d.Price, d.Vegan, d.Shellfish, d.Nuts)
+    d.MenuID, _ = strconv.Atoi(r.FormValue("menuID"))
+    d.Name = r.FormValue("name")
+    d.Price, _ = strconv.Atoi(r.FormValue("price"))
+    d.Vegan = r.FormValue("vegan") == "on"
+    d.Shellfish = r.FormValue("shellfish") == "on"
+    d.Nuts = r.FormValue("nuts") == "on"
+    _, err := addDish(db, d.MenuID, d.Name, d.Price, d.Vegan, d.Shellfish, d.Nuts)
     if err != nil {
         http.Error(w, "Failed to add dish: "+err.Error(), http.StatusInternalServerError)
         return
     }
     fmt.Fprintf(w, `<html><head><title>Add Dish</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-    fmt.Fprintf(w, `<h1>New dish added with ID: %d</h1></body></html>`, id)
+    fmt.Fprintf(w, `<h1>New dish added</h1></body></html>`)
 }
 
 func handleDeleteDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
+    idStr := r.FormValue("id")
     id, err := strconv.Atoi(idStr)
     if err != nil {
         http.Error(w, "Invalid dish ID", http.StatusBadRequest)
