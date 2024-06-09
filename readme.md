@@ -19,9 +19,8 @@ When in the directory you should intialise the database by running the following
 \end{verbatim}
 This will host the webapp at http://localhost:8080/ , which can be accessed from your browser.
 
-\textbf{Prerequisites}
-\begin{itemize}
-    \item GCC
-    \item Sqlite
-    \item Go
-\end{itemize}
+Prerequisites for running the code
+- GCC
+- Sqlite
+- Go
+
