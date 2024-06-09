@@ -5,7 +5,7 @@ We chose to make a delivery service/food ordering application that would track d
 
 We explored the possibility of implementing regular expression matching and context-free as required by the assignment specifications. Ultimately, we failed at this, due to us starting extraordinarily late due to some personal issues among all of us, and switching to SQLite at the very last minute. We sadly ended up discovering (too late) that SQLite did not have support for the regex function natively like postgres does, so what we really just ended up with is a rather simple CRUD application. We hope that this doesn't end up with us failing the subject, but we also realize we should've started way earlier. 
 
-section*{How to run the code / README}
+How to run the code / README
 
 When in the directory you should intialise the database by running the following lines in your terminal. (The following is case sensitive)
 \begin{verbatim}
