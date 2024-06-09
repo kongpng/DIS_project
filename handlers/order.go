@@ -53,7 +53,7 @@ func DeleteOrderHandler(w http.ResponseWriter, r *http.Request) {
         <html>
         <head>
             <title>Delete Order</title>
-            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+            <script src="https://unpkg.com/htmx.org@1.9.12"></script>
         </head>
         <body>
         <form hx-post="/orders" hx-target="#response">
@@ -105,16 +105,15 @@ func HandleDeleteOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 
 	err = DeleteOrder(db, id)
 	if err != nil {
-
 		if err.Error() == fmt.Sprintf("order with ID %d not found", id) {
 			fmt.Fprintf(w, ``)                              // weird
 			http.Error(w, err.Error(), http.StatusNotFound) // 404 Not Found
 			return
 		} else {
+			fmt.Fprintf(w, ``)
 			http.Error(w, "Failed to delete order: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 	}
 	fmt.Fprintf(w, `<html><head><title>Delete Order</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
 	fmt.Fprintf(w, `<h1>Order deleted successfully</h1></body></html>`)

@@ -2,8 +2,130 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>HTMX with Go</title>
+    <title>Dinner Dashers</title>
     <link rel="stylesheet" href="/static/style.css" />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <style>
+      body {
+        background-color: #e0f7e9;
+        font-family: Arial, sans-serif;
+        color: #333;
+        margin: 0;
+        padding: 0;
+      }
+
+      h1 {
+        background-color: #28a745;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        margin: 0;
+      }
+
+      nav {
+        background-color: #218838;
+        padding: 10px 0;
+      }
+
+      nav ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+      }
+
+      nav ul li {
+        display: inline;
+        margin-right: 20px;
+      }
+
+      nav ul li a {
+        color: white;
+        text-decoration: none;
+        font-weight: bold;
+      }
+
+      nav ul li a:hover {
+        text-decoration: underline;
+      }
+
+      h2 {
+        color: #155724;
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      form {
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 20px;
+        max-width: 400px;
+        margin: 20px auto;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: bold;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      input[type="email"],
+      input[type="date"],
+      input[type="submit"] {
+        width: calc(100% - 22px);
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+      }
+
+      input[type="submit"] {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      input[type="submit"]:hover {
+        background-color: #218838;
+      }
+
+      .results {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 10px;
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+    </style>
   </head>
+  <body>
+    <h1>Dinner Dashers</h1>
+    <nav>
+      <ul>
+        <li><a href="/customers">Customers</a></li>
+        <li><a href="/orders">Orders</a></li>
+        <li><a href="/deliveries">Deliveries</a></li>
+        <li><a href="/restaurants">Restaurants</a></li>
+        <li><a href="/menus">Menus</a></li>
+        <li><a href="/dishes">Dishes</a></li>
+      </ul>
+    </nav>
+
+    <h2>Search Customers</h2>
+    <form hx-get="/search" hx-target="#searchCustomersResults">
+      <label>Name: <input type="text" name="name" /></label><br />
+      <label>Address: <input type="text" name="address" /></label><br />
+      <label>Email: <input type="email" name="email" /></label><br />
+      <input type="submit" value="Search" />
+    </form>
+    <div id="searchCustomersResults" class="results"></div>
+  </body>
 </html>

@@ -60,7 +60,7 @@ func DeleteDishHandler(w http.ResponseWriter, r *http.Request) {
         <html>
         <head>
             <title>Delete Dish</title>
-            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+            <script src="https://unpkg.com/htmx.org@1.9.12"></script>
         </head>
         <body>
         <form hx-post="/dishes" hx-target="#response">
@@ -112,12 +112,19 @@ func HandleDeleteDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid dish ID", http.StatusBadRequest)
 		return
 	}
-	if err := DeleteDish(db, id); err != nil {
-		http.Error(w, "Failed to delete dish: "+err.Error(), http.StatusInternalServerError)
-		return
+	err = DeleteDish(db, id)
+	if err != nil {
+		if err.Error() == fmt.Sprintf("dish with ID %d not found", id) {
+			fmt.Fprintf(w, ``)                              // weird
+			http.Error(w, err.Error(), http.StatusNotFound) // 404 Not Found
+			return
+		} else {
+			fmt.Fprintf(w, ``)
+			http.Error(w, "Failed to delete dish: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	fmt.Fprintf(w, `<html><head><title>Delete Dish</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
@@ -154,6 +161,19 @@ func AddDish(db *sql.DB, menuID int, name string, price int, vegan, shellfish, n
 }
 
 func DeleteDish(db *sql.DB, id int) error {
-	_, err := db.Exec("DELETE FROM Dishes WHERE ID = ?", id)
-	return err
+	result, err := db.Exec("DELETE FROM Dishes WHERE ID = ?", id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("dish with ID %d not found", id)
+	}
+
+	return nil
 }

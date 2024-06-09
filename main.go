@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	_ "regexp"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -20,6 +21,7 @@ func executeSQLFile(db *sql.DB, filepath string) error {
 }
 
 func main() {
+
 	db, err := sql.Open("sqlite3", "db/Data.db")
 	if err != nil {
 		log.Fatal(err)
@@ -59,7 +61,6 @@ func main() {
 		return
 	}
 
-	// If no flags are set, start the server
 	setupRoutes(db)
 
 	log.Println("Server starting on http://localhost:8080/")

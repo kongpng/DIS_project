@@ -50,7 +50,7 @@ func DeleteMenuHandler(w http.ResponseWriter, r *http.Request) {
         <html>
         <head>
             <title>Delete Menu</title>
-            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+            <script src="https://unpkg.com/htmx.org@1.9.12"></script>
         </head>
         <body>
         <form hx-post="/menus" hx-target="#response">
@@ -96,12 +96,19 @@ func HandleDeleteMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid menu ID", http.StatusBadRequest)
 		return
 	}
-	if err := DeleteMenu(db, id); err != nil {
-		http.Error(w, "Failed to delete menu: "+err.Error(), http.StatusInternalServerError)
-		return
+	err = DeleteMenu(db, id)
+	if err != nil {
+		if err.Error() == fmt.Sprintf("menu with ID %d not found", id) {
+			fmt.Fprintf(w, ``)                              // weird
+			http.Error(w, err.Error(), http.StatusNotFound) // 404 Not Found
+			return
+		} else {
+			fmt.Fprintf(w, ``)
+			http.Error(w, "Failed to delete menu: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 	fmt.Fprintf(w, `<html><head><title>Delete Menu</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
 	fmt.Fprintf(w, `<h1>Menu deleted successfully</h1></body></html>`)
@@ -137,6 +144,19 @@ func AddMenu(db *sql.DB, restaurantID int) (int, error) {
 }
 
 func DeleteMenu(db *sql.DB, id int) error {
-	_, err := db.Exec("DELETE FROM Menu WHERE ID = ?", id)
-	return err
+	result, err := db.Exec("DELETE FROM Menu WHERE ID = ?", id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("menu with ID %d not found", id)
+	}
+
+	return nil
 }

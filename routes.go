@@ -40,6 +40,9 @@ func setupRoutes(db *sql.DB) {
 	http.HandleFunc("/addDish", handlers.AddDishHandler)
 	http.HandleFunc("/deleteDish", handlers.DeleteDishHandler)
 
+	// Search handler
+	http.HandleFunc("/search", handlers.SearchCustomersHandler(db))
+
 	// Serve static files
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 

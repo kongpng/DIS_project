@@ -38,7 +38,7 @@ func HandleGetCustomers(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, `<html><head><title>Customers List</title><link rel="stylesheet" type="text/css" href="/static/style.css"><script src="https://unpkg.com/htmx.org@1.5.0"></script></head><body>`)
+	fmt.Fprintf(w, `<html><head><title>Customers List</title><link rel="stylesheet" type="text/css" href="/static/style.css"><script src="https://unpkg.com/htmx.org@1.9.12"></script></head><body>`)
 	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addCustomer">Add Customer</a> | <a href="/deleteCustomer">Delete Customer</a></nav>`)
 	fmt.Fprintf(w, `<h1>Customers</h1><ul id="customerList">`)
 	for _, c := range customers {
@@ -62,24 +62,27 @@ func HandlePostCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDeleteCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	idStr := r.FormValue("ID")
-	if idStr == "" {
-		http.Error(w, "Missing customer ID", http.StatusBadRequest)
-		return
-	}
 
+	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
 		return
 	}
 
-	if err := DeleteCustomer(db, id); err != nil {
-		http.Error(w, fmt.Sprintf("Error deleting customer: %v", err), http.StatusInternalServerError)
-		return
+	err = DeleteCustomer(db, id)
+	if err != nil {
+		if err.Error() == fmt.Sprintf("customer with ID %d not found", id) {
+			fmt.Fprintf(w, ``)                              // weird
+			http.Error(w, err.Error(), http.StatusNotFound) // 404 Not Found
+			return
+		} else {
+			fmt.Fprintf(w, ``)
+			http.Error(w, "Failed to delete customer: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
-
-	fmt.Fprintf(w, `<div>Customer deleted successfully</div>`)
+	fmt.Fprintf(w, `<html><head><title>Delete Customer</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+	fmt.Fprintf(w, `<h1>Customer deleted successfully</h1></body></html>`)
 }
 
 func FetchCustomers(db *sql.DB) ([]Customer, error) {
@@ -112,8 +115,21 @@ func AddCustomer(db *sql.DB, name, address, email string) (int, error) {
 }
 
 func DeleteCustomer(db *sql.DB, id int) error {
-	_, err := db.Exec("DELETE FROM Customer WHERE ID = ?", id)
-	return err
+	result, err := db.Exec("DELETE FROM Customer WHERE ID = ?", id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("customer service with ID %d not found", id)
+	}
+
+	return nil
 }
 
 func AddCustomerHandler(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +138,7 @@ func AddCustomerHandler(w http.ResponseWriter, r *http.Request) {
         <html>
         <head>
             <title>Add Customer</title>
-            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+            <script src="https://unpkg.com/htmx.org@1.9.12"></script>
         </head>
         <body>
         <form hx-post="/customers" hx-target="#response">
@@ -144,7 +160,7 @@ func DeleteCustomerHandler(w http.ResponseWriter, r *http.Request) {
         <html>
         <head>
             <title>Delete Customer</title>
-            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+            <script src="https://unpkg.com/htmx.org@1.9.12"></script>
         </head>
         <body>
         <form hx-post="/customers" hx-target="#response">
