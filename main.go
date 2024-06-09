@@ -27,12 +27,10 @@ func main() {
 }
 
 func setupRoutes(db *sql.DB) {
-    // Handle root
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        fmt.Fprintln(w, "Welcome to the API Server")
+        fmt.Fprintf(w, "<html><head><title>Welcome</title><link rel='stylesheet' type='text/css' href='/static/style.css'></head><body>Welcome to the API Server</body></html>")
     })
 
-    // Existing handlers
     http.HandleFunc("/customers", customerHandler(db))
     http.HandleFunc("/orders", orderHandler(db))
     http.HandleFunc("/deliveries", deliveryHandler(db))
@@ -40,16 +38,15 @@ func setupRoutes(db *sql.DB) {
     http.HandleFunc("/menus", menuHandler(db))
     http.HandleFunc("/dishes", dishHandler(db))
 
-    // Catch-all handler for undefined routes
+    http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
     http.HandleFunc("/catch-all", func(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "This route is not defined: "+r.URL.Path, http.StatusNotFound)
     })
 }
 
-
 func customerHandler(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
-        log.Printf("Received %s request for customers", r.Method)
         switch r.Method {
         case "GET":
             handleListCustomers(db, w, r)
@@ -62,13 +59,54 @@ func customerHandler(db *sql.DB) http.HandlerFunc {
         }
     }
 }
+
 func handleListCustomers(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     customers, err := fetchCustomers(db)
     if err != nil {
         http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
         return
     }
-    json.NewEncoder(w).Encode(customers)
+    fmt.Fprintf(w, `<html><head><title>Customers List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Customers</h1><ul>`)
+    for _, c := range customers {
+        fmt.Fprintf(w, `<li>ID: %d, Name: %s, Address: %s, Email: %s</li>`, c.ID, c.Name, c.Address, c.Email)
+    }
+    fmt.Fprintf(w, `</ul></body></html>`)
+}
+
+func handleAddCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+    var c Customer
+    body, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Cannot read body", http.StatusBadRequest)
+        return
+    }
+    if err := json.Unmarshal(body, &c); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+    id, err := addCustomer(db, c.Name, c.Address, c.Email)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Error adding customer: %v", err), http.StatusInternalServerError)
+        return
+    }
+    fmt.Fprintf(w, `<html><head><title>Add Customer</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>New customer added with ID: %d</h1></body></html>`, id)
+}
+
+func handleDeleteCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+    idStr := r.URL.Query().Get("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        http.Error(w, "Invalid customer ID", http.StatusBadRequest)
+        return
+    }
+    if err := deleteCustomer(db, id); err != nil {
+        http.Error(w, fmt.Sprintf("Error deleting customer: %v", err), http.StatusInternalServerError)
+        return
+    }
+    fmt.Fprintf(w, `<html><head><title>Delete Customer</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Customer deleted successfully</h1></body></html>`)
 }
 
 func fetchCustomers(db *sql.DB) ([]Customer, error) {
@@ -87,24 +125,7 @@ func fetchCustomers(db *sql.DB) ([]Customer, error) {
     }
     return customers, nil
 }
-func handleAddCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    var c Customer
-    body, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        http.Error(w, "Cannot read body", http.StatusBadRequest)
-        return
-    }
-    if err := json.Unmarshal(body, &c); err != nil {
-        http.Error(w, "Invalid JSON", http.StatusBadRequest)
-        return
-    }
-    id, err := addCustomer(db, c.Name, c.Address, c.Email)
-    if err != nil {
-        http.Error(w, fmt.Sprintf("Error adding customer: %v", err), http.StatusInternalServerError)
-        return
-    }
-    fmt.Fprintf(w, "New customer added with ID: %d", id)
-}
+
 func addCustomer(db *sql.DB, name, address, email string) (int, error) {
     result, err := db.Exec("INSERT INTO Customer (Name, Address, Email) VALUES (?, ?, ?)", name, address, email)
     if err != nil {
@@ -116,23 +137,25 @@ func addCustomer(db *sql.DB, name, address, email string) (int, error) {
     }
     return int(id), nil
 }
-func handleDeleteCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-    idStr := r.URL.Query().Get("id")
-    id, err := strconv.Atoi(idStr)
-    if err != nil {
-        http.Error(w, "Invalid customer ID", http.StatusBadRequest)
-        return
-    }
-    if err := deleteCustomer(db, id); err != nil {
-        http.Error(w, fmt.Sprintf("Error deleting customer: %v", err), http.StatusInternalServerError)
-        return
-    }
-    fmt.Fprintf(w, "Customer deleted successfully")
-}
 
 func deleteCustomer(db *sql.DB, id int) error {
     _, err := db.Exec("DELETE FROM Customer WHERE ID = ?", id)
     return err
+}
+
+func orderHandler(db *sql.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetOrders(db, w, r)
+        case "POST":
+            handleAddOrder(db, w, r)
+        case "DELETE":
+            handleDeleteOrder(db, w, r)
+        default:
+            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
+        }
+    }
 }
 
 func handleGetOrders(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -141,7 +164,12 @@ func handleGetOrders(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to fetch orders: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    json.NewEncoder(w).Encode(orders)
+    fmt.Fprintf(w, `<html><head><title>Orders List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Orders</h1><ul>`)
+    for _, o := range orders {
+        fmt.Fprintf(w, `<li>Order ID: %d, Customer ID: %d, Date: %s</li>`, o.ID, o.CustomerID, o.Date.Format(time.RFC1123))
+    }
+    fmt.Fprintf(w, `</ul></body></html>`)
 }
 
 func handleAddOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -160,7 +188,8 @@ func handleAddOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to add order: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "New order added with ID: %d", id)
+    fmt.Fprintf(w, `<html><head><title>Add Order</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>New order added with ID: %d</h1></body></html>`, id)
 }
 
 func handleDeleteOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -174,10 +203,10 @@ func handleDeleteOrder(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to delete order: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "Order deleted successfully")
+    fmt.Fprintf(w, `<html><head><title>Delete Order</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Order deleted successfully</h1></body></html>`)
 }
 
-// Fetch, Add, and Delete functions for Orders
 func fetchOrders(db *sql.DB) ([]Order, error) {
     rows, err := db.Query("SELECT ID, CustomerID, Date FROM Orders")
     if err != nil {
@@ -211,27 +240,34 @@ func deleteOrder(db *sql.DB, id int) error {
     _, err := db.Exec("DELETE FROM Orders WHERE ID = ?", id)
     return err
 }
-func orderHandler(db *sql.DB) http.HandlerFunc {
+
+func deliveryHandler(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         switch r.Method {
         case "GET":
-            handleGetOrders(db, w, r)
+            handleGetDeliveries(db, w, r)
         case "POST":
-            handleAddOrder(db, w, r)
+            handleAddDelivery(db, w, r)
         case "DELETE":
-            handleDeleteOrder(db, w, r)
+            handleDeleteDelivery(db, w, r)
         default:
             http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
         }
     }
 }
+
 func handleGetDeliveries(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     deliveries, err := fetchDeliveries(db)
     if err != nil {
         http.Error(w, "Failed to fetch deliveries: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    json.NewEncoder(w).Encode(deliveries)
+    fmt.Fprintf(w, `<html><head><title>Deliveries</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Deliveries</h1><ul>`)
+    for _, d := range deliveries {
+        fmt.Fprintf(w, `<li>Delivery ID: %d, Order ID: %d, Time: %d, Cost: %d</li>`, d.ID, d.OrderID, d.DTime, d.DCost)
+    }
+    fmt.Fprintf(w, `</ul></body></html>`)
 }
 
 func handleAddDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -250,7 +286,8 @@ func handleAddDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to add delivery: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "New delivery added with ID: %d", id)
+    fmt.Fprintf(w, `<html><head><title>Add Delivery</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>New delivery added with ID: %d</h1></body></html>`, id)
 }
 
 func handleDeleteDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -264,7 +301,8 @@ func handleDeleteDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to delete delivery: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "Delivery deleted successfully")
+    fmt.Fprintf(w, `<html><head><title>Delete Delivery</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Delivery deleted successfully</h1></body></html>`)
 }
 
 func fetchDeliveries(db *sql.DB) ([]Delivery, error) {
@@ -301,15 +339,15 @@ func deleteDelivery(db *sql.DB, id int) error {
     return err
 }
 
-func deliveryHandler(db *sql.DB) http.HandlerFunc {
+func restaurantHandler(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         switch r.Method {
         case "GET":
-            handleGetDeliveries(db, w, r)
+            handleGetRestaurants(db, w, r)
         case "POST":
-            handleAddDelivery(db, w, r)
+            handleAddRestaurant(db, w, r)
         case "DELETE":
-            handleDeleteDelivery(db, w, r)
+            handleDeleteRestaurant(db, w, r)
         default:
             http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
         }
@@ -322,12 +360,17 @@ func handleGetRestaurants(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to fetch restaurants: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    json.NewEncoder(w).Encode(restaurants)
+    fmt.Fprintf(w, `<html><head><title>Restaurants List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Restaurants</h1><ul>`)
+    for _, r := range restaurants {
+        fmt.Fprintf(w, `<li>ID: %d, Name: %s, Address: %s, Open: %t, Cuisine: %s</li>`, r.ID, r.Name, r.Address, r.Open, r.Cuisine)
+    }
+    fmt.Fprintf(w, `</ul></body></html>`)
 }
 
-func handleAddRestaurant(db *sql.DB, w http.ResponseWriter, req *http.Request) {
+func handleAddRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     var restaurant Restaurant
-    body, err := ioutil.ReadAll(req.Body)
+    body, err := ioutil.ReadAll(r.Body)
     if err != nil {
         http.Error(w, "Cannot read body", http.StatusBadRequest)
         return
@@ -341,9 +384,9 @@ func handleAddRestaurant(db *sql.DB, w http.ResponseWriter, req *http.Request) {
         http.Error(w, "Failed to add restaurant: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "New restaurant added with ID: %d", id)
+    fmt.Fprintf(w, `<html><head><title>Add Restaurant</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>New restaurant added with ID: %d</h1></body></html>`, id)
 }
-
 
 func handleDeleteRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     idStr := r.URL.Query().Get("id")
@@ -356,7 +399,8 @@ func handleDeleteRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) 
         http.Error(w, "Failed to delete restaurant: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "Restaurant deleted successfully")
+    fmt.Fprintf(w, `<html><head><title>Delete Restaurant</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Restaurant deleted successfully</h1></body></html>`)
 }
 
 func fetchRestaurants(db *sql.DB) ([]Restaurant, error) {
@@ -369,9 +413,9 @@ func fetchRestaurants(db *sql.DB) ([]Restaurant, error) {
     for rows.Next() {
         var r Restaurant
         if err := rows.Scan(&r.ID, &r.Name, &r.Address, &r.Open, &r.Cuisine); err != nil {
-            return nil, err
-        }
-        restaurants = append(restaurants, r)
+        return nil, err
+    }
+    restaurants = append(restaurants, r)
     }
     return restaurants, nil
 }
@@ -393,21 +437,6 @@ func deleteRestaurant(db *sql.DB, id int) error {
     return err
 }
 
-func restaurantHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetRestaurants(db, w, r)
-        case "POST":
-            handleAddRestaurant(db, w, r)
-        case "DELETE":
-            handleDeleteRestaurant(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
 func menuHandler(db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         switch r.Method {
@@ -422,14 +451,19 @@ func menuHandler(db *sql.DB) http.HandlerFunc {
         }
     }
 }
-// Menu Handlers
+
 func handleGetMenus(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     menus, err := fetchMenus(db)
     if err != nil {
         http.Error(w, "Failed to fetch menus: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    json.NewEncoder(w).Encode(menus)
+    fmt.Fprintf(w, `<html><head><title>Menus List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Menus</h1><ul>`)
+    for _, m := range menus {
+        fmt.Fprintf(w, `<li>ID: %d, Restaurant ID: %d</li>`, m.ID, m.RestaurantID)
+    }
+    fmt.Fprintf(w, `</ul></body></html>`)
 }
 
 func handleAddMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -448,7 +482,8 @@ func handleAddMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to add menu: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "New menu added with ID: %d", id)
+    fmt.Fprintf(w, `<html><head><title>Add Menu</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>New menu added with ID: %d</h1></body></html>`, id)
 }
 
 func handleDeleteMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -462,7 +497,8 @@ func handleDeleteMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to delete menu: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "Menu deleted successfully")
+    fmt.Fprintf(w, `<html><head><title>Delete Menu</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Menu deleted successfully</h1></body></html>`)
 }
 
 func fetchMenus(db *sql.DB) ([]Menu, error) {
@@ -499,14 +535,33 @@ func deleteMenu(db *sql.DB, id int) error {
     return err
 }
 
-// Dish Handlers
+func dishHandler(db *sql.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        switch r.Method {
+        case "GET":
+            handleGetDishes(db, w, r)
+        case "POST":
+            handleAddDish(db, w, r)
+        case "DELETE":
+            handleDeleteDish(db, w, r)
+        default:
+            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
+        }
+    }
+}
+
 func handleGetDishes(db *sql.DB, w http.ResponseWriter, r *http.Request) {
     dishes, err := fetchDishes(db)
     if err != nil {
         http.Error(w, "Failed to fetch dishes: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    json.NewEncoder(w).Encode(dishes)
+    fmt.Fprintf(w, `<html><head><title>Dishes List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Dishes</h1><ul>`)
+    for _, d := range dishes {
+        fmt.Fprintf(w, `<li>ID: %d, Menu ID: %d, Name: %s, Price: %d, Vegan: %t, Shellfish: %t, Nuts: %t</li>`, d.ID, d.MenuID, d.Name, d.Price, d.Vegan, d.Shellfish, d.Nuts)
+    }
+    fmt.Fprintf(w, `</ul></body></html>`)
 }
 
 func handleAddDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -525,7 +580,8 @@ func handleAddDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to add dish: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "New dish added with ID: %d", id)
+    fmt.Fprintf(w, `<html><head><title>Add Dish</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>New dish added with ID: %d</h1></body></html>`, id)
 }
 
 func handleDeleteDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
@@ -539,7 +595,8 @@ func handleDeleteDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Failed to delete dish: "+err.Error(), http.StatusInternalServerError)
         return
     }
-    fmt.Fprintf(w, "Dish deleted successfully")
+    fmt.Fprintf(w, `<html><head><title>Delete Dish</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
+    fmt.Fprintf(w, `<h1>Dish deleted successfully</h1></body></html>`)
 }
 
 func fetchDishes(db *sql.DB) ([]Dish, error) {
@@ -575,23 +632,6 @@ func deleteDish(db *sql.DB, id int) error {
     _, err := db.Exec("DELETE FROM Dishes WHERE ID = ?", id)
     return err
 }
-
-func dishHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        switch r.Method {
-        case "GET":
-            handleGetDishes(db, w, r)
-        case "POST":
-            handleAddDish(db, w, r)
-        case "DELETE":
-            handleDeleteDish(db, w, r)
-        default:
-            http.Error(w, "Unsupported method", http.StatusMethodNotAllowed)
-        }
-    }
-}
-
-
 
 // Define data structures
 type Customer struct {
