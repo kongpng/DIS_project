@@ -18,7 +18,12 @@ func MenusHandler(db *sql.DB) http.HandlerFunc {
 		case "GET":
 			HandleGetMenus(db, w, r)
 		case "POST":
-			HandlePostMenu(db, w, r)
+			action := r.FormValue("action")
+			if action == "delete" {
+				HandleDeleteMenu(db, w, r)
+			} else {
+				HandlePostMenu(db, w, r)
+			}
 		}
 	}
 }
@@ -39,11 +44,24 @@ func AddMenuHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteMenuHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			HandleDeleteMenu(db, w, r)
-		}
+func DeleteMenuHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		fmt.Fprintf(w, `
+        <html>
+        <head>
+            <title>Delete Menu</title>
+            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+        </head>
+        <body>
+        <form hx-post="/menus" hx-target="#response">
+            <input type="hidden" name="action" value="delete" />
+            <label>Menu ID: <input type="number" name="ID" /></label><br/>
+            <input type="submit" value="Delete Menu" />
+        </form>
+        <div id="response"></div>
+        </body>
+        </html>
+        `)
 	}
 }
 
@@ -54,7 +72,7 @@ func HandleGetMenus(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, `<html><head><title>Menus List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addMenu">Add Menu</a></nav>`)
+	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addMenu">Add Menu</a></nav>| <a href="/deleteMenu">Delete Menu</a></nav>`)
 	fmt.Fprintf(w, `<h1>Menus</h1><ul>`)
 	for _, m := range menus {
 		fmt.Fprintf(w, `<li>ID: %d, Restaurant ID: %d</li>`, m.ID, m.RestaurantID)
@@ -75,7 +93,7 @@ func HandlePostMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDeleteMenu(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	idStr := r.FormValue("id")
+	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid menu ID", http.StatusBadRequest)

@@ -21,7 +21,12 @@ func RestaurantsHandler(db *sql.DB) http.HandlerFunc {
 		case "GET":
 			HandleGetRestaurants(db, w, r)
 		case "POST":
-			HandlePostRestaurant(db, w, r)
+			action := r.FormValue("action")
+			if action == "delete" {
+				HandleDeleteRestaurant(db, w, r)
+			} else {
+				HandlePostRestaurant(db, w, r)
+			}
 		}
 	}
 }
@@ -45,11 +50,24 @@ func AddRestaurantHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteRestaurantHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			HandleDeleteRestaurant(db, w, r)
-		}
+func DeleteRestaurantHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		fmt.Fprintf(w, `
+        <html>
+        <head>
+            <title>Delete Restaurant</title>
+            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+        </head>
+        <body>
+        <form hx-post="/restaurants" hx-target="#response">
+            <input type="hidden" name="action" value="delete" />
+            <label>Restaurant ID: <input type="number" name="ID" /></label><br/>
+            <input type="submit" value="Delete Restaurant" />
+        </form>
+        <div id="response"></div>
+        </body>
+        </html>
+        `)
 	}
 }
 
@@ -61,7 +79,7 @@ func HandleGetRestaurants(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, `<html><head><title>Restaurants List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addRestaurant">Add Restaurant</a></nav>`)
+	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addRestaurant">Add Restaurant</a></nav>| <a href="/deleteRestaurant">Delete Restaurant</a></nav>`)
 	fmt.Fprintf(w, `<h1>Restaurants</h1><ul>`)
 	for _, r := range restaurants {
 		fmt.Fprintf(w, `<li>ID: %d, Name: %s, Address: %s, Open: %t, Cuisine: %s</li>`, r.ID, r.Name, r.Address, r.Open, r.Cuisine)
@@ -85,7 +103,7 @@ func HandlePostRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDeleteRestaurant(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	idStr := r.FormValue("id")
+	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid restaurant ID", http.StatusBadRequest)

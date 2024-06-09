@@ -8,10 +8,10 @@ import (
 )
 
 type Delivery struct {
-	ID      int `json:"id"`
-	OrderID int `json:"order_id"`
-	DTime   int `json:"dtime"`
-	DCost   int `json:"dcost"`
+	ID           int `json:"id"`
+	OrderID      int `json:"order_id"`
+	DeliveryTime int `json:"delivery_time"`
+	DeliveryCost int `json:"delivery_cost"`
 }
 
 func DeliveryHandler(db *sql.DB) http.HandlerFunc {
@@ -20,7 +20,12 @@ func DeliveryHandler(db *sql.DB) http.HandlerFunc {
 		case "GET":
 			HandleGetDeliveries(db, w, r)
 		case "POST":
-			HandlePostDelivery(db, w, r)
+			action := r.FormValue("action")
+			if action == "delete" {
+				HandleDeleteDelivery(db, w, r)
+			} else {
+				HandlePostDelivery(db, w, r)
+			}
 		}
 	}
 }
@@ -34,8 +39,8 @@ func AddDeliveryHandler(db *sql.DB) http.HandlerFunc {
             <body>
             <form action="/deliveries" method="post">
                 <label>Order ID: <input type="number" name="orderID" /></label><br/>
-                <label>Delivery Time (HH:MM): <input type="time" name="dTime" /></label><br/>
-                <label>Delivery Cost: <input type="number" name="dCost" /></label><br/>
+                <label>Delivery Time (HH:MM): <input type="time" name="deliveryTime" /></label><br/>
+                <label>Delivery Cost: <input type="number" name="deliveryCost" /></label><br/>
                 <input type="submit" value="Add Delivery" />
             </form>
             </body>
@@ -45,11 +50,24 @@ func AddDeliveryHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func DeleteDeliveryHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			HandleDeleteDelivery(db, w, r)
-		}
+func DeleteDeliveryHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		fmt.Fprintf(w, `
+        <html>
+        <head>
+            <title>Delete Delivery</title>
+            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+        </head>
+        <body>
+        <form hx-post="/deliveries" hx-target="#response">
+            <input type="hidden" name="action" value="delete" />
+            <label>Delivery ID: <input type="number" name="ID" /></label><br/>
+            <input type="submit" value="Delete Delivery" />
+        </form>
+        <div id="response"></div>
+        </body>
+        </html>
+        `)
 	}
 }
 
@@ -61,10 +79,10 @@ func HandleGetDeliveries(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, `<html><head><title>Deliveries</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addDelivery">Add Delivery</a></nav>`)
+	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addDelivery">Add Delivery</a> | <a href="/deleteDelivery">Delete Delivery</a></nav>`)
 	fmt.Fprintf(w, `<h1>Deliveries</h1><ul>`)
 	for _, d := range deliveries {
-		fmt.Fprintf(w, `<li>Delivery ID: %d, Order ID: %d, Time: %d, Cost: %d</li>`, d.ID, d.OrderID, d.DTime, d.DCost)
+		fmt.Fprintf(w, `<li>Delivery ID: %d, Order ID: %d, Time: %d, Cost: %d</li>`, d.ID, d.OrderID, d.DeliveryTime, d.DeliveryCost)
 	}
 	fmt.Fprintf(w, `</ul></body></html>`)
 }
@@ -72,9 +90,9 @@ func HandleGetDeliveries(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 func HandlePostDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	var d Delivery
 	d.OrderID, _ = strconv.Atoi(r.FormValue("orderID"))
-	d.DTime, _ = strconv.Atoi(r.FormValue("dTime"))
-	d.DCost, _ = strconv.Atoi(r.FormValue("dCost"))
-	_, err := AddDelivery(db, d.OrderID, d.DTime, d.DCost)
+	d.DeliveryTime, _ = strconv.Atoi(r.FormValue("deliveryTime"))
+	d.DeliveryCost, _ = strconv.Atoi(r.FormValue("deliveryCost"))
+	_, err := AddDelivery(db, d.OrderID, d.DeliveryTime, d.DeliveryCost)
 	if err != nil {
 		http.Error(w, "Failed to add delivery: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -84,7 +102,7 @@ func HandlePostDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDeleteDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	idStr := r.FormValue("id")
+	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid delivery ID", http.StatusBadRequest)
@@ -99,7 +117,7 @@ func HandleDeleteDelivery(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func FetchDeliveries(db *sql.DB) ([]Delivery, error) {
-	rows, err := db.Query("SELECT ID, OrderID, DTime, DCost FROM DeliveryService")
+	rows, err := db.Query("SELECT ID, OrderID, DeliveryTime, DeliveryCost FROM DeliveryService")
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +125,7 @@ func FetchDeliveries(db *sql.DB) ([]Delivery, error) {
 	var deliveries []Delivery
 	for rows.Next() {
 		var d Delivery
-		if err := rows.Scan(&d.ID, &d.OrderID, &d.DTime, &d.DCost); err != nil {
+		if err := rows.Scan(&d.ID, &d.OrderID, &d.DeliveryTime, &d.DeliveryCost); err != nil {
 			return nil, err
 		}
 		deliveries = append(deliveries, d)
@@ -115,8 +133,8 @@ func FetchDeliveries(db *sql.DB) ([]Delivery, error) {
 	return deliveries, nil
 }
 
-func AddDelivery(db *sql.DB, orderID, dTime, dCost int) (int, error) {
-	result, err := db.Exec("INSERT INTO DeliveryService (OrderID, DTime, DCost) VALUES (?, ?, ?)", orderID, dTime, dCost)
+func AddDelivery(db *sql.DB, orderID, deliveryTime, deliveryCost int) (int, error) {
+	result, err := db.Exec("INSERT INTO DeliveryService (OrderID, DeliveryTime, DeliveryCost) VALUES (?, ?, ?)", orderID, deliveryTime, deliveryCost)
 	if err != nil {
 		return 0, err
 	}

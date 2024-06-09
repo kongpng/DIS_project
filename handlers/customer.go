@@ -22,7 +22,12 @@ func CustomersHandler(db *sql.DB) http.HandlerFunc {
 		case "GET":
 			HandleGetCustomers(db, w, r)
 		case "POST":
-			HandlePostCustomer(db, w, r)
+			action := r.FormValue("action")
+			if action == "delete" {
+				HandleDeleteCustomer(db, w, r)
+			} else {
+				HandlePostCustomer(db, w, r)
+			}
 		}
 	}
 }
@@ -33,9 +38,9 @@ func HandleGetCustomers(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error fetching customers: %v", err), http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, `<html><head><title>Customers List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addCustomer">Add Customer</a></nav>`)
-	fmt.Fprintf(w, `<h1>Customers</h1><ul>`)
+	fmt.Fprintf(w, `<html><head><title>Customers List</title><link rel="stylesheet" type="text/css" href="/static/style.css"><script src="https://unpkg.com/htmx.org@1.5.0"></script></head><body>`)
+	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addCustomer">Add Customer</a> | <a href="/deleteCustomer">Delete Customer</a></nav>`)
+	fmt.Fprintf(w, `<h1>Customers</h1><ul id="customerList">`)
 	for _, c := range customers {
 		fmt.Fprintf(w, `<li>ID: %d, Name: %s, Address: %s, Email: %s</li>`, c.ID, c.Name, c.Address, c.Email)
 	}
@@ -47,28 +52,34 @@ func HandlePostCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	c.Name = r.FormValue("name")
 	c.Address = r.FormValue("address")
 	c.Email = r.FormValue("email")
-	_, err := AddCustomer(db, c.Name, c.Address, c.Email)
+	id, err := AddCustomer(db, c.Name, c.Address, c.Email)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error adding customer: %v", err), http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, `<html><head><title>Add Customer</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<h1>New customer added</h1></body></html>`)
+	c.ID = id
+	fmt.Fprintf(w, `<div>New customer added: ID: %d, Name: %s, Address: %s, Email: %s</div>`, c.ID, c.Name, c.Address, c.Email)
 }
 
 func HandleDeleteCustomer(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	idStr := r.FormValue("id")
+	idStr := r.FormValue("ID")
+	if idStr == "" {
+		http.Error(w, "Missing customer ID", http.StatusBadRequest)
+		return
+	}
+
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid customer ID", http.StatusBadRequest)
 		return
 	}
+
 	if err := DeleteCustomer(db, id); err != nil {
 		http.Error(w, fmt.Sprintf("Error deleting customer: %v", err), http.StatusInternalServerError)
 		return
 	}
-	fmt.Fprintf(w, `<html><head><title>Delete Customer</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<h1>Customer deleted successfully</h1></body></html>`)
+
+	fmt.Fprintf(w, `<div>Customer deleted successfully</div>`)
 }
 
 func FetchCustomers(db *sql.DB) ([]Customer, error) {
@@ -109,24 +120,41 @@ func AddCustomerHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		fmt.Fprintf(w, `
         <html>
-        <head><title>Add Customer</title></head>
+        <head>
+            <title>Add Customer</title>
+            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+        </head>
         <body>
-        <form action="/customers" method="post">
+        <form hx-post="/customers" hx-target="#response">
             <label>Name: <input type="text" name="name" /></label><br/>
             <label>Address: <input type="text" name="address" /></label><br/>
             <label>Email: <input type="email" name="email" /></label><br/>
             <input type="submit" value="Add Customer" />
         </form>
+        <div id="response"></div>
         </body>
         </html>
         `)
 	}
 }
 
-func DeleteCustomerHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			HandleDeleteCustomer(db, w, r)
-		}
+func DeleteCustomerHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		fmt.Fprintf(w, `
+        <html>
+        <head>
+            <title>Delete Customer</title>
+            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+        </head>
+        <body>
+        <form hx-post="/customers" hx-target="#response">
+            <input type="hidden" name="action" value="delete" />
+            <label>Customer ID: <input type="number" name="ID" /></label><br/>
+            <input type="submit" value="Delete Customer" />
+        </form>
+        <div id="response"></div>
+        </body>
+        </html>
+        `)
 	}
 }

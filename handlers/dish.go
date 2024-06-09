@@ -23,7 +23,12 @@ func DishesHandler(db *sql.DB) http.HandlerFunc {
 		case "GET":
 			HandleGetDishes(db, w, r)
 		case "POST":
-			HandlePostDish(db, w, r)
+			action := r.FormValue("action")
+			if action == "delete" {
+				HandleDeleteDish(db, w, r)
+			} else {
+				HandlePostDish(db, w, r)
+			}
 		}
 	}
 }
@@ -49,11 +54,24 @@ func AddDishHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func DeleteDishHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "POST" {
-			HandleDeleteDish(db, w, r)
-		}
+func DeleteDishHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		fmt.Fprintf(w, `
+        <html>
+        <head>
+            <title>Delete Dish</title>
+            <script src="https://unpkg.com/htmx.org@1.5.0"></script>
+        </head>
+        <body>
+        <form hx-post="/dishes" hx-target="#response">
+            <input type="hidden" name="action" value="delete" />
+            <label>Dish ID: <input type="number" name="ID" /></label><br/>
+            <input type="submit" value="Delete Dish" />
+        </form>
+        <div id="response"></div>
+        </body>
+        </html>
+        `)
 	}
 }
 
@@ -65,7 +83,7 @@ func HandleGetDishes(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, `<html><head><title>Dishes List</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
-	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addDish">Add Dish</a></nav>`)
+	fmt.Fprintf(w, `<nav><a href="/">Home</a> | <a href="/addDish">Add Dish</a></nav> | <a href="/deleteDish">Delete Dish</a></nav>`)
 	fmt.Fprintf(w, `<h1>Dishes</h1><ul>`)
 	for _, d := range dishes {
 		fmt.Fprintf(w, `<li>ID: %d, Menu ID: %d, Name: %s, Price: %d, Vegan: %t, Shellfish: %t, Nuts: %t</li>`, d.ID, d.MenuID, d.Name, d.Price, d.Vegan, d.Shellfish, d.Nuts)
@@ -91,7 +109,7 @@ func HandlePostDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func HandleDeleteDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	idStr := r.FormValue("id")
+	idStr := r.FormValue("ID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid dish ID", http.StatusBadRequest)
@@ -101,6 +119,7 @@ func HandleDeleteDish(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to delete dish: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	fmt.Fprintf(w, `<html><head><title>Delete Dish</title><link rel="stylesheet" type="text/css" href="/static/style.css"></head><body>`)
 	fmt.Fprintf(w, `<h1>Dish deleted successfully</h1></body></html>`)
 }
